@@ -1,0 +1,435 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>虚拟化与存储技术 </title>
+    <style>
+        :root {
+            --primary-color: #2b5876;
+            --secondary-color: #4e4376;
+            --success-color: #2ecc71;
+            --error-color: #e74c3c;
+            --bg-color: #f5f7fa;
+            --card-bg: #ffffff;
+            --text-color: #2c3e50;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            text-align: center;
+            padding: 2rem 1rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        header h1 { margin: 0; font-size: 1.8rem; }
+        header p { margin: 0.5rem 0 0 0; opacity: 0.8; font-size: 0.9.5rem; }
+
+        .container {
+            max-width: 850px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .filter-nav {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border: 2px solid #e2e8f0;
+            padding: 0.5rem 1.2rem;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover, .btn.active {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .question-card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+            border-left: 5px solid var(--secondary-color);
+        }
+
+        .question-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            color: white;
+            margin-right: 0.5rem;
+        }
+        .badge-choice { background-color: #3498db; }
+        .badge-judge { background-color: #9b59b6; }
+
+        .options-list { list-style-type: none; padding: 0; margin: 0; }
+        .option-item { margin-bottom: 0.8rem; }
+
+        .option-label {
+            display: flex;
+            align-items: flex-start;
+            padding: 0.75rem 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .option-label:hover {
+            background-color: #f8fafc;
+            border-color: #cbd5e1;
+        }
+
+        .option-label input {
+            margin-right: 0.75rem;
+            margin-top: 0.25rem;
+        }
+
+        /* 答题锁定后的状态 */
+        .question-card.answered { border-left-color: #cbd5e1; }
+        
+        /* 强制高亮正确/错误选项 */
+        .option-label.correct-target {
+            background-color: rgba(46, 204, 113, 0.15) !important;
+            border-color: var(--success-color) !important;
+            color: #1e7e34;
+            font-weight: bold;
+        }
+
+        .option-label.wrong-clicked {
+            background-color: rgba(231, 76, 60, 0.15) !important;
+            border-color: var(--error-color) !important;
+            color: #bd2130;
+        }
+
+        /* 动态解析盒子 */
+        .instant-feedback {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .instant-feedback.show { display: block; }
+        .instant-feedback.true-style { background-color: rgba(46, 204, 113, 0.08); border-left: 4px solid var(--success-color); }
+        .instant-feedback.false-style { background-color: rgba(231, 76, 60, 0.08); border-left: 4px solid var(--error-color); }
+
+        .feedback-status { font-size: 1.1rem; font-weight: bold; margin-bottom: 0.3rem; }
+        .feedback-status.true-text { color: var(--success-color); }
+        .feedback-status.false-text { color: var(--error-color); }
+        
+        .analysis-text { color: #555; font-size: 0.95rem; margin-top: 0.3rem; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>虚拟化与存储技术 </h1>
+           </header>
+
+    <div class="container">
+        <div class="filter-nav">
+            <button class="btn active" onclick="filterQuiz('all')">全部题库</button>
+            <button class="btn" onclick="filterQuiz('choice')">仅单选题</button>
+            <button class="btn" onclick="filterQuiz('judge')">仅判断题</button>
+        </div>
+
+        <div id="quiz-container"></div>
+    </div>
+
+    <script>
+        // 包含完整题目和原文档配套解析的数据源
+        const quizData = [
+            { id: 1, type: "choice", q: "虚拟机通过什么技术将物理资源抽象成逻辑资源?", options: ["模拟技术", "虚拟化技术", "克隆技术", "分布式技术"], ans: "B", parse: "虚拟机通过虚拟化技术将物理资源(如CPU、内存、存储、网络等)抽象成逻辑资源,为每个虚拟机提供独立的计算环境。" },
+            { id: 2, type: "choice", q: "系统虚拟机和进程虚拟机的主要区别是什么?", options: ["系统虚拟机运行完整的操作系统,进程虚拟机运行特定应用程序", "系统虚拟机运行特定应用程序,进程虚拟机运行完整的操作系统", "系统虚拟机和进程虚拟机没有区别", "系统虚拟机用于备份,进程虚拟机用于测试"], ans: "A", parse: "系统虚拟机(如VMware、VirtualBox)能够运行完整的操作系统,而进程虚拟机(如Java虚拟机)用于运行特定的应用程序。" },
+            { id: 3, type: "choice", q: "虚拟机快照的主要用途不包括以下哪一项?", options: ["系统恢复", "测试和开发", "数据加密", "临时配置"], ans: "C", parse: "虚拟机快照的主要用途包括系统恢复、测试和开发、备份和临时配置,但不包括数据加密。" },
+            { id: 4, type: "choice", q: "虚拟机的隔离性主要体现在:", options: ["不同虚拟机可以共享同一操作系统", "不同虚拟机之间相互隔离,运行独立的操作系统", "虚拟机可以访问物理机的所有资源", "虚拟机之间可以自由访问彼此的数据"], ans: "B", parse: "虚拟机的隔离性体现在不同虚拟机之间相互隔离,运行独立的操作系统,彼此之间不能直接访问对方的数据。" },
+            { id: 5, type: "choice", q: "以下哪种虚拟机主要用于运行完整的操作系统?", options: ["系统虚拟机", "进程虚拟机", "应用虚拟机", "网络虚拟机"], ans: "A", parse: "系统虚拟机能够提供完整的底层硬件抽象，从而可以独立安装和运行一个完整的操作系统。" },
+            { id: 6, type: "choice", q: "KVM虚拟化技术的核心是什么?", options: ["基于Windows 内核", "基于Linux 内核", "基于MacOS 内核", "基于BSD 内核"], ans: "B", parse: "KVM（Kernel-based Virtual Machine）是直接集成在 Linux 内核中的虚拟化模块，将其变成了一个硬核的 Hypervisor。" },
+            { id: 7, type: "choice", q: "安装 KVM 前需要关闭防火墙的命令是?", options: ["systemctl start firewalld", "systemctl disable firewalld", "firewall-cmd --reload", "iptables-F"], ans: "B", parse: "disable 命令用于设置防火墙开机不自启，在实际实训和环境中常用于避免网络端口策略拦截。" },
+            { id: 8, type: "choice", q: "创建物理卷(PV) sdb1 的命令是?", options: ["vgcreate/dev/sdb1", "Ivcreate /dev/sdb1", "pvcreate/dev/sdb1", "fdisk /dev/sdb1"], ans: "C", parse: "LVM 构建顺序：先用 pvcreate 创建物理卷，再用 vgcreate 创建卷组，最后用 lvcreate 创建逻辑卷。" },
+            { id: 9, type: "choice", q: "libvirt的主要功能是?", options: ["提供 Linux 内核模块", "提供虚拟化管理程序的编程接口", "直接管理物理硬件", "替代 KVM 功能"], ans: "B", parse: "libvirt 是一个开源的 API 库、守护进程和管理工具，用于管理虚拟化平台（如 KVM、Xen 等）。" },
+            { id: 10, type: "choice", q: "安装KVM 时需要安装的软件包不包括?", options: ["qemu-kvm", "openssl", "libvirt", "docker"], ans: "D", parse: "Docker 属于容器技术，KVM 安装主要依赖 qemu-kvm、libvirt 和 virt-install 等架构组件。" },
+            { id: 17, type: "choice", q: "在安装可视化管理工具时,用于进入可视化界面的命令是()", options: ["startx", "starty", "startz", "startw"], ans: "A", parse: "在 Linux 命令行环境下，键入 startx 命令可以启动 X Window 图形化桌面系统。" },
+            { id: 18, type: "choice", q: "在安装可视化管理工具时,以下命令用于安装虚拟化管理工具的是()", options: ["yum groupinstall \"X Window System\"", "yum groupinstall\" GNOME Desktop\" \"Graphical Administration Tools\"", "yum install -y virt-manager", "startx"], ans: "C", parse: "virt-manager 是底层的 KVM 图形化管理客户端，可通过 yum 独立快速安装。" },
+            { id: 19, type: "choice", q: "以下快捷键用于在可视化界面和命令行界面快速切换的是()", options: ["ctrl+alt+F1和 ctrl+alt+F2", "ctrl+alt+F1和 ctrl+alt+F3", "ctrl+alt+F2和ctrl+alt+F3", "ctrl+alt+F1和 ctrl+alt+F4"], ans: "B", parse: "在配置好的虚拟化图形界面中，Ctrl+Alt+F1 与 F3 常用于切换图形控制台与虚拟终端。" },
+            { id: 21, type: "choice", q: "VNC (Virtual Network Computing)是一款什么样的远程控制工具? ()", options: ["基于Windows 操作系统的付费软件", "基于UNIX 和Linux操作系统的免费且开源的软件", "基于MAC 操作系统的商业软件", "基于Android 操作系统的免费软件"], ans: "B", parse: "VNC 是一款经典的跨平台开源远程图形控制工具，广泛应用在 Linux 服务器的管理和维护中。" },
+            { id: 22, type: "choice", q: "VNC 主要由哪两部分组成?()", options: ["客户端应用程序和浏览器", "客户端应用程序 (VNC Viewer)和服务器端应用程序(VNC Server)", "服务器端应用程序和 Java Web 接口", "客户端应用程序和 X Server"], ans: "B", parse: "VNC 采用典型的 C/S 架构，由服务端的 VNC Server 抓取画面，客户端的 VNC Viewer 进行控制接收。" },
+            { id: 23, type: "choice", q: "在关闭 VNC 端口1时,关闭指定端口的命令是()", options: ["vncserver -kill:1", "vncserver -stop: 1", "vncserver -close: 1", "vncserver -remove: 1"], ans: "A", parse: "使用 vncserver -kill :桌面号 命令可以安全杀掉并关闭指定的 VNC 图形服务线程。" },
+            { id: 27, type: "choice", q: "Virtio是一种用于虚拟化环境的()", options: ["网络协议", "标准化 I/O 设备接口", "数据库管理系统", "操作系统"], ans: "B", parse: "Virtio 是半虚拟化架构中提出的一种用于客户机和宿主机之间高效数据传输的标准化 I/O 接口规范。" },
+            { id: 28, type: "choice", q: "Virtio的主要目的机制是()", options: ["提高虚拟机的图形性能", "提高内存、硬盘、网络的性能", "提高虚拟机的启动速度", "提高虚拟机的用户界面友好度"], ans: "B", parse: "Virtio 通过引入旁路和共享内存环机制，避开传统繁重的全硬件状态模拟，能够大幅拔高存储与网络的吞吐量。" },
+            { id: 29, type: "choice", q: "Virtio广泛应用于以下哪些虚拟化平台?()", options: ["KVM", "Xen", "QEMU", "以上都是"], ans: "D", parse: "作为一个事实上的开源标准，Virtio 驱动协议被 KVM、Xen、QEMU 等绝大多数主流 Linux 虚拟化引擎原生支持。" },
+            { id: 34, type: "choice", q: "在 KVM 虚拟化环境中，若要创建卷组（VG）sdb1 的命令是（ ）", options: ["fdisk /dev/sdb", "pvcreate /dev/sdb1", "vgcreate vmvg /dev/sdb1", "lvcreate -n lvvml -l 20479 vmvg"], ans: "C", parse: "vgcreate [卷组名] [物理卷路径] 用于将已经初始化的物理卷加入或聚合成一个大卷组。" },
+            { id: 35, type: "choice", q: "在 KVM 虚拟化环境中，查看磁盘信息的命令是（ ）", options: ["cat /etc/redhat-release", "fdisk -l | more", "lsblk", "mount"], ans: "B", parse: "fdisk -l 命令能够输出当前系统连接的各种物理及虚拟磁盘的详细大小、扇区和分区表信息。" },
+            { id: 36, type: "choice", q: "libvirt 是一个（ ）", options: ["仅支持 KVM 的管理工具", "开放源代码的应用程序接口、守护进程和管理工具", "仅支持 Windows 虚拟化的工具", "仅支持容器虚拟化的工具"], ans: "B", parse: "libvirt 是高级虚拟化框架，设计初衷就是为了抽象和统一不同 Hypervisor 之间的配置。 " },
+            { id: 37, type: "choice", q: "virt-install 适合的使用场景不包括（ ）", options: ["自动化和脚本化部署", "服务器环境", "图形化操作", "远程管理"], ans: "C" , parse: "virt-install 是一个完全基于命令行的轻量化虚拟机创建工具，不具备原生可视化的拖拽点击按钮。"},
+            { id: 38, type: "choice", q: "在 virt-install 中，指定虚拟机 CPU 数量的参数是（ ）", options: ["--name", "--ram", "--vcpus", "--os-type"], ans: "C", parse: "--vcpus 用于精确映射指定分配给 Guest OS 运行的虚拟 CPU 核心数。" },
+            { id: 44, type: "choice", q: "根据宏内核和微内核的对比，以下哪一项是微内核的特点？", options: ["通信效率高（函数调用）", "稳定性低（模块集成在一起）", "扩展性高（模块间互不影响）", "代码量多（需要实现所有模块）"], ans: "C", parse: "微内核将绝大多数服务（如文件系统、网络）挪到了用户空间，模块高隔离，是以进程间通信（IPC）来交付的，因此扩展与替换极为方便。" },
+            { id: 45, type: "choice", q: "以下哪种接口类型适用于数据中心的高性能计算？", options: ["IDE", "SCSI", "SATA", "NVMe"], ans: "D", parse: "NVMe（Non-Volatile Memory Express）基于 PCIe 通道，并发极高，具备极低的延迟与超高的读写速度。" },
+            { id: 46, type: "choice", q: "哪种网络模式下的虚拟机不能直接访问外部网络？", options: ["桥接模式", "NAT 模式", "仅主机模式", "以上都不是"], ans: "C", parse: "仅主机模式（Host-Only）默认不配置任何连接外网的虚拟 NAT 路由网关，完全被封锁在宿主机和虚拟机的内部局域网内。" },
+            { id: 47, type: "choice", q: "在 CentOS 7 中配置网卡时，若设置 BOOTPROTO 为 static，需要额外配置哪些属性？", options: ["GATEWAY, DNS, BROADCAST", "NETMASK, BROADCAST, DNS", "IPADDR, NETMASK, GATEWAY", "IPADDR, GATEWAY, DNS"], ans: "D", parse: "配置静态 IP 时，最核心的三要素即为：静态 IP 地址（IPADDR）、默认网关（GATEWAY）以及域名服务器（DNS）。" },
+            { id: 48, type: "choice", q: "以下哪个是修改网卡 ens33 所需要的指令？", options: ["vi /etc/network-scripts/sysconfig/ifcfg-ens33", "vi /etc/sysconfig/network-scripts/ifcfg-ens33", "vi /network-scripts/etc/sysconfig/ifcfg-ens33", "vi /network-scripts/sysconfig/etc/ifcfg-ens33"], ans: "B", parse: "CentOS 7 标准的网卡脚本存放目录绝对路径为 `/etc/sysconfig/network-scripts/`。" },
+            { id: 49, type: "choice", q: "KVM 平台有两种存储方式，以下哪个属于基于设备的存储？", options: ["dir", "fs", "netfs", "Disk"], ans: "D", parse: "dir/fs/netfs 都是基于文件系统的逻辑层，而 Disk 模式直接映射宿主机的物理磁盘或物理设备块。" },
+            { id: 50, type: "choice", q: "哪种类型的虚拟磁盘在配置时会指定磁盘大小，并且不管实际存储多少数据，都将占用相同大小的主机磁盘空间？", options: ["固定（Fixed）", "动态（Dynamic）", "差分（Differencing）", "以上都不是"], ans: "A", parse: "固定格式（或厚分配模式）会在初始创建时进行全盘写入清零，立刻锁定并占满宿主机对应的物理空间。" },
+            { id: 51, type: "choice", q: "以下哪个是使用 dd 命令模拟创建一个 2GB 大小且没有空洞的磁盘文件的指令？", options: ["dd if=/dev/zero of=flat1.img bs=1024k count=1000", "dd if=/dev/zero of=flat1.img bs=2048k count=1000", "dd if=/dev/zero of=flat1.img bs=2048k count=500", "dd if=/dev/zero of=flat1.img bs=1024k count=500"], ans: "B", parse: "计算公式：块大小（bs）× 块数量（count）。2048k（2MB）× 1000 = 2000MB ≈ 2GB，且数据源取自 /dev/zero 保证其实体占满物理扇区。" },
+            { id: 52, type: "choice", q: "Docker 的主要优势是什么？", options: ["高资源占用。", "快速启动和轻量级。", "需要模拟完整的操作系统。", "启动缓慢。"], ans: "B", parse: "Docker 利用 Namespace 与 Cgroups 技术共享宿主机内核，不需要运行全套虚拟机 OS，因此启动速度可达毫秒级。" },
+            { id: 53, type: "choice", q: "Docker 容器与虚拟机的主要区别是什么？", options: ["Docker 容器需要模拟完整的操作系统。", "Docker 容器之间的应用进程不隔离。", "Docker 容器共享宿主机的内核。", "Docker 容器启动缓慢。"], ans: "C", parse: "虚拟机内置 Guest OS 内核，而容器直接共享 Host OS 的内核，仅在应用运行空间级别进行进程隔离。" },
+            { id: 54, type: "choice", q: "以下哪个命令用于启动 Docker 服务？", options: ["sudo systemctl stop docker", "sudo systemctl start docker", "sudo systemctl disable docker", "sudo systemctl enable docker"], ans: "B", parse: "systemctl start 是现代 Linux 系统中拉起任何指定系统级后台服务的标准守护命令。" },
+            { id: 57, type: "choice", q: "以下哪个命令用于拉取 Docker 官方的 registry 镜像？", options: ["docker pull registry", "docker pull docker:latest", "docker pull mysql:5.7", "docker pull hello-world"], ans: "A", parse: "registry 镜像是 Docker 官方提供的用来在企业内部部署和组建私有镜像仓库的通用基础镜像。" },
+            { id: 58, type: "choice", q: "编写 daemon.json 脚本的命令是", options: ["vi /etc/docker/daemon.json", "vi /etc/docker/config.json", "vi /etc/docker/registry.json", "vi /etc/docker/settings.json"], ans: "A", parse: "`/etc/docker/daemon.json` 是 Docker 引擎核心的全局运行属性与国内加速源站点的配置文件。" },
+            { id: 59, type: "choice", q: "在不修改 cp 命令参数一切都是默认的情况下，空洞磁盘在复制后，新磁盘为什么磁盘？", options: ["非空洞磁盘", "空洞磁盘", "差分磁盘", "以上均不对"], ans: "B", parse: "Linux 的 cp 命令足够智能，默认在处理具有稀疏特征（Sparse）的空洞文件时，复制出来的全新副本依然会保持空洞特性，不额外撑满物理空间。" },
+            { id: 60, type: "choice", q: "在 KVM 环境中键入命令 qemu-img create -f qcow2 -o? 后，preallocation 参数允许的四个值分别是？", options: ["on, metadata, falloc, fill", "off, metadata, falloc, full", "off, metadata, malloc, fill", "off, data, malloc, full"], ans: "B", parse: "KVM 磁盘预分配机制允许的值包括：off（不分配）、metadata（仅分配元数据）、falloc（预留空间）和 full（全额空间填满）。" },
+            { id: 61, type: "choice", q: "将 Windows 中的虚拟机导出为 vmdk 格式的磁盘并放入 KVM 环境中进行迁移，是否需要对 vmdk 格式的磁盘进行格式转换？", options: ["不需要", "需要", "看情况而定", "以上均不正确"], ans: "B", parse: "VMware 原生使用 vmdk 格式，而 KVM 对 qcow2 的综合性能及快照支持最好，跨虚拟化平台迁移前必须经过格式转换。" },
+            { id: 62, type: "choice", q: "将一个名为 test_centos79-disk1 的 vmdk 磁盘转换为 qcow2 磁盘需要键入的命令是?", options: ["qemu-img convert -f vmdk -O qcow2 test_centos79-disk1.qcow2 test_centos79-disk1.vmdk", "qemu-img convert -f vmdk -O qcow2 test_centos79-disk1.vmdk test_centos79-disk1.qcow2", "qemu-img convert -c vmdk -O qcow2 test_centos79-disk1.vmdk test_centos79-disk1.qcow2", "qemu-img convert -c vmdk -O qcow2 test_centos79-disk1.qcow2 test_centos79-disk1.vmdk"], ans: "B", parse: "qemu-img convert 的语法为：-f [源格式] -O [目标大写格式] [源文件路径] [目标输出文件路径]。" },
+            { id: 63, type: "choice", q: "在嵌套虚拟机中，对 /vm 下的 Base_CentOS79.qcow2 进行创建快照的指令是哪个？", options: ["qemu-img snapshot -c s1 /vm/Base_CentOS79.qcow2", "qemu-img snapshot -l /vm/Base_CentOS79.qcow2", "qemu-img snapshot -a s1 /vm/Base_CentOS79.qcow2", "qemu-img snapshot -d s1 /vm/Base_CentOS79.qcow2"], ans: "A", parse: "-c 代表 create（创建快照），s1 为指定的快照名称标记。" },
+            { id: 64, type: "choice", q: "对于一个虚拟机来说，存储池 and 存储卷是否是必须存在的？", options: ["是", "不是", "看情况而定", "以上均不正确"], ans: "B", parse: "虽然 libvirt 推荐用存储池进行集中管理，但虚拟机也可以直接指定并拉取宿主机中某个绝对路径下的裸磁盘镜像文件独立运行。" },
+            { id: 65, type: "choice", q: "在 NFS 中，服务器的 ip 是 192.168.226.100，服务器的共享目录是 /share_server_1, 客户端的挂载目录是 /client_to_server_1，想要将客户端的挂载目录与服务器的共享目录挂载成功，需要键入一下哪个指令？", options: ["mount nfs -t 192.168.226.100:/share_server_1 /client_to_server_1", "mount nfs -t 192.168.226.100:/client_to_server_1 /share_server_1", "mount -t nfs 192.168.226.100:/share_server_1 /client_to_server_1", "mount -t nfs 192.168.226.100:/client_to_server_1 /share_server_1"], ans: "C", parse: "通用网络挂载命令：mount -t [协议类型] [服务器IP:共享绝对目录] [本地挂载目标路径]。" },
+            { id: 66, type: "choice", q: "以下关于 LVM 的说法哪个是错误的？", options: ["LVM 可以将多块硬盘看作一块大硬盘。", "LVM 可以创建小的逻辑卷（LV），在空间不足时再动态调整它的大小。", "LVM 不允许被创建快照，也不可以保存文件系统的备份。", "LVM 可以在调整逻辑卷（LV）大小时可以不用考虑逻辑卷在硬盘上的位置，不用担心没有可用的连续空间。"], ans: "C", parse: "LVM 原生拥有强大的快照（Snapshot）机制，不仅允许创建快照，还经常被用作生产环境下低开销数据在线备份的核心策略。" },
+            { id: 67, type: "choice", q: "以下关于虚拟网桥，说法正确的是？", options: ["虚拟网桥不是网桥概念在网络虚拟化环境中的延伸。", "虚拟网桥以软件的形式运行在虚拟化平台上，也可以像传统网桥那样以硬件设备的形式存在。", "虚拟网桥 can 连接虚拟机之间的虚拟网络接口，但不可以连接虚拟网络与物理网络接口，因此想要实现不同虚拟网络或虚拟机与外部网络之间的通信需要一个额外的 NAT 设备。", "以上均不正确"], ans: "D", parse: "前三项叙述均有逻辑漏洞。虚拟网桥是纯软件抽象的，它不仅连接虚拟机接口，也能完美绑定并桥接物理网卡（如 eth0），实现与外网的同网段直连通信。" },
+            { id: 68, type: "choice", q: "有两块硬盘分别是 sda 和 sdb。现在分别对 sda 和 sdb 进行分区处理，sda 分成三份，分别记为 /dev/sda1 、/dev/sda2 、/dev/sda3。sdb 分成两份，分别记为 /dev/sdb1 、/dev/sdb2 。对除了 /dev/sda1 以外的所有分区进行创建物理卷。对这些不同分区的物理卷，以下哪个配对不能组成卷组？", options: ["/dev/sda2 和 /dev/sda3", "/dev/sda3 和 /dev/sdb1", "/dev/sda3 和 /dev/sdb2", "/dev/sda1 和 /dev/sdb2"], ans: "D", parse: "因为题目条件中明确指出“除了 /dev/sda1 以外”的所有分区创建了物理卷，说明 sda1 根本还不是 PV，所以它绝对不可能加入卷组（VG）。" },
+            { id: 77, type: "choice", q: "以下哪个是设置 libvirt 开机自启动的指令？", options: ["systemctl start libvirtd", "systemctl libvirtd start", "systemctl enable libvirtd", "systemctl libvirtd enable"], ans: "C", parse: "systemctl enable 命令用于向 Linux 系统的 target 注册软链接，从而达到开机跟随系统拉起的效果。" },
+            { id: 78, type: "choice", q: "以下关于 KVM 的陈述，哪项是正确的？", options: ["KVM 独立 in Linux 内核之外。", "在 KVM 中，虚拟机是一个 Linux 进程，由用户空间 and 内核空间进行调度和管理。", "利用 KVM 运行的虚拟机可受益于 Linux 的性能特性，且用户可以利用 Linux 调度程序提供的精细控制。", "以上均不正确"], ans: "C", parse: "KVM 将虚拟机完全融入 Linux 进程模型。虚拟机享受宿主机内核提供的进程调度、内存优化（如 KSM）及安全防护，具有天然的技术生态优势。" },
+            { id: 79, type: "choice", q: "在添加新硬盘操作中，创建 PV 和 VG 之后，要查看 VG 中的哪个属性去进行下一步的分配？", options: ["VG size", "PE size", "Alloc PE", "Free PE"], ans: "D", parse: "Free PE 字段直接反映了当前卷组内还剩多少个未分配的物理块，这是决定下一步划分逻辑卷最大可用容量的直接依据。" },
+            { id: 82, type: "choice", q: "使用 dockerfile 去构建新镜像的步骤是以下三条操作按照什么顺序进行的？\n1. docker run 镜像\n2. docker build 镜像\n3. 编写 dockerfile 文件", options: ["1-2-3", "2-3-1", "3-1-2", "3-2-1"], ans: "D", parse: "标准开发工作流：先人工编辑好文本描述文件 Dockerfile（3），接着调用引擎构建出镜像实体（2），最后通过 run 命令实例化为容器运行（1）。" },
+            { id: 85, type: "choice", q: "以下哪个不是当前操作系统的内核分类？", options: ["宏内核", "微内核", "多内核", "混合内核"], ans: "C", parse: "操作系统学界公认的核心分类有：宏内核（Monolithic）、微内核（Micro）、混合内核（Hybrid）及外内核（Exokernel）。没有多内核这一标准称谓。" },
+            { id: 88, type: "choice", q: "以下关于 NFS 的论述正确的是？", options: ["NFS 中的 Server 端 and Client 端必须一一对应。", "NFS 中的 Server 端和 Client 端的配置方法相同。", "NFS 中的 Client 端的挂载目录无法挂载到目标 Server 端的共享目录上，只可能是网络原因。", "以上说法均不正确。"], ans: "D", parse: "NFS 支持一对多共享；服务端与客户端配置完全不同；挂载失败还可能是权限配置不妥（如 exports 规则拦截）或 RPC 映射出错，故 ABC 均错。" },
+            { id: 91, type: "choice", q: "以下哪种虚拟机类型用于运行完整的操作系统？", options: ["进程虚拟机", "系统虚拟机", "Java 虚拟机", "应用虚拟机"], ans: "B", parse: "系统虚拟机提供的是全套裸硬件设备级的虚拟环境，支持无缝加载不同的通用操作系统。" },
+            { id: 92, type: "choice", q: "以下哪种一种不是操作系统内核的主要分类？", options: ["宏内核", "微内核", "混合内核", "外核"], ans: "D", parse: "这道题是原题库复现，由于拼写或分类重叠，本题干扰项在文档里归为外核并非主流日常系统所包含的普通三类，或者D属于其定义之外。" },
+            { id: 93, type: "choice", q: "NAT 模式下，虚拟机通过哪个虚拟网卡与外部网络通信？", options: ["VMnet0", "VMnet1", "VMnet8", "VMnet9"], ans: "C", parse: "在 VMware 网络拓扑中，VMnet0 用于桥接，VMnet1 用于仅主机，VMnet8 则是预留给内嵌 NAT 网络的专属路由接口。" },
+            { id: 94, type: "choice", q: "KVM 是以下哪一部分的组成部分？", options: ["Windows 内核", "Linux 内核", "Hyper-V", "VirtualBox"], ans: "B", parse: "KVM 模块在 Linux 2.6.20 版本就已经被合入了 Linux 内核主线分支，是纯正的 Linux 技术。" },
+            { id: 95, type: "choice", q: "使用以下哪个命令可以列出所有虚拟机？", options: ["virsh list --all", "vm-list", "kvm-list", "qemu-list"], ans: "A", parse: "virsh list 默认只展示正在运行的实例，加上 --all 参数可以连同已经关机、休眠的虚拟机完整倾倒出来。" },
+            { id: 96, type: "choice", q: "半虚拟化驱动（virtio）主要用于提高哪些性能？", options: ["仅 CPU", "内存、硬盘、网络", "仅图形", "仅存储"], ans: "B", parse: "virtio 协议族中包含了针对磁盘（virtio-blk）和网卡（virtio-net）等多维度的全套半虚拟化性能加速驱动。" },
+            { id: 97, type: "choice", q: "libvirt 的主要功能不包括：", options: ["虚拟机管理", "虚拟 network 管理", "物理机监控", "存储管理"], ans: "C", parse: "libvirt 专注于控制和编排各类“虚拟化”资产和边界，它并不承担企业级物理机底层底层硬件健康状况深度监控的职责。" },
+            { id: 98, type: "choice", q: "以下哪个命令用于创建快照？", options: ["qemu-img snapshot -c", "qemu-img snapshot -d", "qemu-img snapshot -l", "qemu-img snapshot -a"], ans: "A", parse: "命令参数含义：-c 创建，-d 删除，-l 列表展示，-a 恢复到指定快照状态。" },
+            { id: 99, type: "choice", q: "NFS 服务向 RPC 注册端口信息的作用是：", options: ["客户端发现服务", "服务端发现客户端", "加密数据传输", "负载均衡"], ans: "A", parse: "NFS 各守护进程接口端口并不固定，需要向 rpcbind 注册，从而保证客户端连接 111 端口时能顺藤摸瓜找到目标服务。" },
+            { id: 100, type: "choice", q: "存储池的主要作用是：", options: ["替代物理存储", "集中管理存储资源", "加密数据", "备份数据"], ans: "B", parse: "存储池把宿主机的各种物理分散存储（分区、NFS、LVM）封装起来，便于上层快速切分出存储卷供虚拟机使用。" },
+            { id: 101, type: "choice", q: "逻辑卷（LV）调整大小时需要注意的是：", options: ["必须连续空间", "必须重启虚拟机", "不需连续空间", "必须使用 raw 格式"], ans: "C", parse: "LVM 的一大精髓即为映射层解耦，它可以任意组合离散的 PE 块，因此扩容收缩绝不需要底层具备连续的物理块盘符。" },
+            { id: 102, type: "choice", q: "Docker 主要用于解决：", options: ["硬件虚拟化", "运行环境和配置问题", "网络配置", "存储管理"], ans: "B" , parse: "Docker 提出的“一次构建，到处运行”的核心就在于通过容器连同代码、环境、配置全套打包，规避了环境迁移导致的运行崩溃。"},
+            { id: 103, type: "choice", q: "构建 Docker 镜像的命令是：", options: ["docker run", "docker build", "docker pull", "docker push"], ans: "B", parse: "docker build 命令可以自动根据本地指定目录中的 Dockerfile 指令脚本逐层构建出只读的镜像模板。" },
+            { id: 120, type: "choice", q: "VMware Workstation 中，虚拟机与物理网络处于同一网段、拥有独立 IP 地址的网络模式是()。", options: ["NAT 模式", "桥接模式", "仅主机模式", "自定义模式"], ans: "B", parse: "桥接网络使虚拟机的网卡在链路层直接嫁接在物理交换机上，地位与局域网内其他物理机完全等同。" },
+
+            // 判断题数据（前台渲染为二选一单选）
+            { id: 121, type: "judge", q: "KVM 是开源的硬件虚拟化技术，属于 Linux 内核的一部分。", options: ["正确", "错误"], ans: "A", parse: "KVM 是 Kernel-based Virtual Machine 的缩写，原生集成于 Linux 内核之中。" },
+            { id: 122, type: "judge", q: "在 KVM 中，每个虚拟机在宿主机上都表现为一个标准的 Linux 进程。", options: ["正确", "错误"], ans: "A", parse: "KVM 借用了 Linux 本身的任务管理，每个虚拟机在系统进程树中就是由 QEMU 衍生出的进程。" },
+            { id: 123, type: "judge", q: "QEMU 主要负责 KVM 架构中的硬件行为模拟（如 CPU、网卡、磁盘）。", options: ["正确", "错误"], ans: "A", parse: "KVM 只负责高效内核级 CPU 与内存虚拟化，外设硬件（网卡磁盘显示器）的繁琐仿真全权交由用户空间的 QEMU 完成。" },
+            { id: 124, type: "judge", q: "libvirt 是专门为 KVM 开发的，不能用于管理其他虚拟化技术（如 Xen）。", options: ["正确", "错误"], ans: "B", parse: "libvirt 采用了高度可扩展的驱动架构，可以同时支持统一接管 KVM、Xen、VMware、Hyper-V 等多种虚拟化引擎。" },
+            { id: 125, type: "judge", q: "virt-manager 是一个基于 web 的图形化 KVM 管理工具。", options: ["正确", "错误"], ans: "B", parse: "virt-manager 是基于 GTK 桌面图形框架开发的本地桌面客户端软件，并非运行在 Web 浏览器里的网页服务。" },
+            { id: 126, type: "judge", q: "KVM 虚拟机冷迁移时，需要保持虚拟机的运行状态。", options: ["正确", "错误"], ans: "B", parse: "冷迁移（Cold Migration）的核心定义就是必须先把虚拟机关机，然后单纯进行静态磁盘和配置文件文件的跨主机拷贝。" },
+            { id: 127, type: "judge", q: "KVM 虚拟机热迁移（Live Migration）要求源宿主机和目标宿主机使用相同的存储（如 NFS 共享存储）。", options: ["正确", "错误"], ans: "A", parse: "热迁移期间两端宿主机要实时共享并接管同一块物理磁盘数据，因此共享网络存储（如 NFS/SAN）是绝对的硬性前置条件。" },
+            { id: 128, type: "judge", q: "在桥接模式（Bridge）下，虚拟机和宿主机在同一个网段内，拥有独立的 IP 地址。", options: ["正确", "错误"], ans: "A", parse: "桥接模式直接通过宿主机的物理网卡向本地物理路由器申请独立的 IP，所以在同一局域网网段内。" },
+            { id: 129, type: "judge", q: "在 NAT 模式下，外部网络中的计算机可以直接访问虚拟机的内部服务。", options: ["正确", "错误"], ans: "B", parse: "NAT 模式对内建立了强隔离的私有子网，外部物理机无法直接感知它的存在，除非宿主机显式配置了端口映射规则。" },
+            { id: 130, type: "judge", q: "在仅主机模式（Host-Only）下，虚拟机可以通过宿主机访问外部互联网。", options: ["正确", "错误"], ans: "B", parse: "仅主机网络默认彻底切断了任何网络地址转换（NAT）外网路由出口，旨在搭建完全封闭、安全演练的内部单机测试网络。" },
+            { id: 131, type: "judge", q: "KVM 平台的 raw 磁盘格式支持快照功能。", options: ["正确", "错误"], ans: "B", parse: "raw 格式属于纯原始的裸流块分配，其内部元数据极其简单，原生不支持快照，也不支持 Copy-on-Write（写时复制）。" },
+            { id: 132, type: "judge", q: "KVM 平台的 qcow2 磁盘格式支持写时复制（Copy-on-Write）和快照。", options: ["正确", "错误"], ans: "A", parse: "qcow2（QEMU Copy On Write v2）是专门为高度灵活的虚拟化而设计的，原生内置轻量化高开销快照管理支持。" },
+            { id: 133, type: "judge", q: "使用 qemu-img 命令创建磁盘时，预分配模式（preallocation）设置为 full 会立刻占用所有指定空间。", options: ["正确", "错误"], ans: "A", parse: "full 模式会在物理宿主机上分配所有虚拟磁盘所需的扇区，并把数据全部刷写为 0，行为类似于固定格式（Thick provisioning）。" },
+            { id: 134, type: "judge", q: "KVM 存储池（Storage Pool）只能是本地目录，不能是网络文件系统。", options: ["正确", "错误"], ans: "B", parse: "libvirt 的存储池概念极度宽泛，支持本地 dir、LVM 逻辑卷组、GlusterFS 以及 NFS 网络挂载等多种灵活的后端。" },
+            { id: 135, type: "judge", q: "LVM（逻辑卷管理）可以在不丢失数据的前提下动态扩展虚拟机的磁盘空间。", options: ["正确", "错误"], ans: "A", parse: "LVM 的核心优势就是可以在线热扩容（lvextend），配合 resize2fs 或 xfs_growfs 可以在完全不损毁数据的情况下完成空间升级。" },
+            { id: 136, type: "judge", q: "NFS（网络文件系统）在 KVM 虚拟化中常用于多宿主机共享同一个存储池。", options: ["正确", "错误"], ans: "A", parse: "NFS 可以支持多个 Client 端宿主机并发挂载 Server 端的同一个目录，非常适合作为中小型多节点群集的共享资源底座。" },
+            { id: 137, type: "judge", q: "Virtio 是一种半虚拟化（Para-virtualization）驱动，旨在提高 KVM 虚拟机的 I/O 性能。", options: ["正确", "错误"], ans: "A", parse: "Virtio 属于半虚拟化协同接口。它省去了复杂的全硬件异常捕获与寄存器模拟，使得 Guest 直接与 Host 交换缓冲区，性能极高。" },
+            { id: 138, type: "judge", q: "如果虚拟机操作系统中没有安装 virtio 驱动，虚拟机将完全无法运行。", options: ["正确", "错误"], ans: "B", parse: "如果没有 virtio 驱动，虚拟机可以降级退回到普通的 IDE/SATA/SCSI 等全模拟模式下低效运行，绝非彻底无法开启。" },
+            { id: 139, type: "judge", q: "Docker 容器拥有自己独立的 Linux 内核。", options: ["正确", "错误"], ans: "B", parse: "Docker 容器是进程隔离级应用，所有容器在运行时都无缝依赖并共享同一个物理宿主机的 Linux 内核。" },
+            { id: 140, type: "judge", q: "Docker 容器与传统虚拟机相比，具有启动快、资源占用少的特点。", options: ["正确", "错误"], ans: "A", parse: "容器免去了独立内核自检、内存空间全额预留和长周期的 OS 组件拉起，本质上就是一个被隔离的轻量级主机进程。" },
+            { id: 141, type: "judge", q: "Docker 镜像是只读的，容器通过在镜像顶部添加一个可写层来运行。", options: ["正确", "错误"], ans: "A", parse: "Docker 基于联合文件系统（UnionFS）。底部所有镜像层皆为只读，只有在容器启动时才会动态叠加一个用于临时存写的 Container Layer。" },
+            { id: 142, type: "judge", q: "使用 docker run 命令时，-d 参数表示在后台运行容器。", options: ["正确", "错误"], ans: "A", parse: "-d 是 --detach 的简写，意味着容器在启动后会将控制台标准输出脱离，默默在宿主机后台作为守护进程持久运行。" },
+            { id: 143, type: "judge", q: "使用 docker exec 命令可以进入一个正在运行的容器中执行命令。", options: ["正确", "错误"], ans: "A", parse: "docker exec -it [容器名] /bin/bash 可以不中断原有主进程，在外部为该容器临时开启一个新的交互式执行通道。" },
+            { id: 144, type: "judge", q: "Dockerfile 中的 FROM 指令用于指定基础镜像。", options: ["正确", "错误"], ans: "A", parse: "每一个符合规范的 Dockerfile 开篇第一行非注释指令（除 ARG 外）必须是 FROM，以此引入一个作为环境底座的先祖镜像。" },
+            { id: 145, type: "judge", q: "Dockerfile 中的 RUN 指令和 CMD 指令的功能完全相同，都是在容器启动时执行。", options: ["正确", "错误"], ans: "B", parse: "RUN 在镜像“构建阶段”（docker build）执行，用于往只读层安装软件；而 CMD 则是在容器“启动运行阶段”（docker run）时作为默认主命令执行。" },
+            { id: 146, type: "judge", q: "Kubernetes（K8s）是 Google 开源的容器编排引擎，用于自动化部署、扩展和管理容器化应用。", options: ["正确", "错误"], ans: "A", parse: "K8s 目前是全球事实上的云原生工业级容器自动化编排与群集集群弹性管理的统治性开源标准。" },
+            { id: 147, type: "judge", q: "OpenStack 是一种容器管理平台，类似于 Docker Swarm。", options: ["正确", "错误"], ans: "B", parse: "OpenStack 是一个庞大复杂的开源“基础设施即服务（IaaS）”云操作系统，主要用于对标和编排虚拟机及底层物理硬件资源。" },
+            { id: 148, type: "judge", q: "SDN（软件定义网络）将网络的控制平面与数据转发平面进行了分离。", options: ["正确", "错误"], ans: "A", parse: "SDN的核心奥义就是抽取控制大脑（Control Plane），实现软件编程集中控制，下层物理或虚拟硬件仅负责傻瓜式的线性数据转发（Data Plane）。" },
+            { id: 149, type: "judge", q: "分布式存储系统（如 Ceph）具有高扩展性、高可靠性和高性能的特点。", options: ["正确", "错误"], ans: "A", parse: "Ceph 利用 CRUSH 算法剔除了传统的中心元数据节点，多副本分布式落盘，随着存储节点增多其性能和容量呈现优异的线性增长。" },
+            { id: 150, type: "judge", q: "超融合架构（HCI）将计算、存储、网络和虚拟化资源集成在单一的硬件服务器中。", options: ["正确", "错误"], ans: "A", parse: "超融合利用软件定义技术，在一台标准的 X86 物理刀片服务器内部，通过虚拟化层把计算（vCPU）、存储（分布式卷）全面紧密打通融合。" },
+            { id: 151, type: "judge", q: "在 VMware 中，快照文件会随着虚拟机的使用而不断增大，因此不建议长期保留过多快照。", options: ["正确", "错误"], ans: "A", parse: "快照依靠增量日志稀疏存储，快照拉得越长，宿主机磁盘随机 IO 开销和膨胀体积就越恐怖，生产环境通常只用于临时系统变更保护。" },
+            { id: 152, type: "judge", q: "通过修改 /etc/selinux/config 文件可以将 SELinux 永久关闭。", options: ["正确", "错误"], ans: "A", parse: "把文件内的 SELINUX=enforcing 这一属性修改为 disabled，保存并重启机器，SELinux 内核强制策略就会永久闭锁。" },
+            { id: 153, type: "judge", q: "在 Linux 中，systemctl disable firewalld 命令会立即停止防火墙服务。", options: ["正确", "错误"], ans: "B", parse: "disable 仅仅是将防火墙移除开机自动引导序列；如果想要“立刻停止”当前正在活动的防火墙进程，必须强制键入 `systemctl stop firewalld`。" },
+            { id: 154, type: "judge", q: "使用 pvcreate 命令可以创建物理卷，这是构建 LVM 的第一步。", options: ["正确", "错误"], ans: "A", parse: "LVM 的堆叠金字塔底座即为 PV。唯有先把普通的裸盘分区改造成具有物理块标识的 PV 卷，上层卷组才能识别吸纳。" },
+            { id: 155, type: "judge", q: "VNC 工具既可以用于远程图形化管理宿主机，也可以用于连接虚拟机的控制台。", options: ["正确", "错误"], ans: "A", parse: "VNC 极度百搭，由于 KVM/QEMU 原生就在每个虚拟机实例后背绑定了隐式 VNC 渲染监听，因此可以通过 VNC 客户端直接透传进虚机主画面。" },
+            { id: 156, type: "judge", q: "在 KVM 中，virsh destroy 命令等同于在物理机上直接拔掉电源。", options: ["正确", "错误"], ans: "A", parse: "virsh shutdown 会发送 ACPI 软关机温和信号，而 virsh destroy 则是无视虚机系统状态强行向底层进程发送 SIGKILL 直接掐断电源。" },
+            { id: 157, type: "judge", q: "KVM 虚拟机的配置文件默认以 XML 格式保存在 /etc/libvirt/qemu/ 目录下。", options: ["正确", "错误"], ans: "A", parse: "libvirt 体系下，全套域（Domain）声明、硬件设备挂载拓扑皆是用最纯正的 XML 格式静态存盘在此目录下。" },
+            { id: 158, type: "judge", q: "通过 virsh edit 虚拟机名 修改配置文件后，不需要重启虚拟机即可立即生效。", options: ["正确", "错误"], ans: "B", parse: "virsh edit 修改的是静态磁盘文件里的 XML 模板。由于内存中运行着的进程状态已经固化，修改后通常必须通过 define、start 重新热加载或硬重启才能生效。" },
+            { id: 159, type: "judge", q: "qemu-img convert 命令可以将 VMware 的 VMDK 格式磁盘转换为 KVM 支持的 qcow2 格式。", options: ["正确", "错误"], ans: "A", parse: "qemu-img convert 具有强悍的行业主流磁盘交叉解译能力，是物理机转虚拟机（P2V）或跨平台异构迁移的核心神技。" },
+            { id: 160, type: "judge", q: "NFS 服务依赖于 RPC（远程过程调用）服务来进行端口映射。", options: ["正确", "错误"], ans: "A", parse: "NFS 本身是个轻量共享内核协议，本身不维护庞大复杂的通讯端口链。所有请求必须依靠 111 端口的 rpcbind 进行动态中央登记和端口路由分发。" },
+            { id: 161, type: "judge", q: "在 /etc/fstab 文件中配置挂载信息，可以实现开机自动挂载 NFS 共享。", options: ["正确", "错误"], ans: "A", parse: "`/etc/fstab` 是 Linux 用来控制开机磁盘以及网络设备装载最底层的核心表格，只要配置得当，开机便会伴随网络拉起自动执行挂载。" },
+            { id: 162, type: "judge", q: "LVM 的卷组（VG）大小受限于单个物理硬盘的容量。", options: ["正确", "错误"], ans: "B", parse: "卷组（VG）本质上是一个巨大的硬件资源抽象池，它被设计出来的初衷就是支持把十几块甚至上百块五花八门、容量不一的硬盘连在一起。" },
+            { id: 163, type: "judge", q: "虚拟网桥（Virtual Bridge）在网络虚拟化中主要靠软件来实现。", options: ["正确", "错误"], ans: "A", parse: "Linux 内核直接内置了软件网桥（Bridge）驱动。利用 brctl 或 ip link 就能直接在宿主机内存中虚拟出功能齐备的二层软件交换机。" },
+            { id: 164, type: "judge", q: "在 Docker 中，docker rm 用于删除镜像，docker rmi 用于删除容器。", options: ["正确", "错误"], ans: "B", parse: "指令记反了！rm 对应的就是普通的 remove（清理容器状态）；rmi 的那个 'i' 字母明确指向 image（清理本地静态只读镜像）。" },
+            { id: 165, type: "judge", q: "Docker Hub 是 Docker 官方提供的公共镜像仓库服务。", options: ["正确", "错误"], ans: "A", parse: "Docker Hub 是全球目前资源最丰富、访问最频密的公共开源镜像存储和交流枢纽中心。" },
+            { id: 166, type: "judge", q: "通过配置 Docker 的 daemon.json 文件，可以添加国内镜像加速源。", options: ["正确", "错误"], ans: "A", parse: "通过在文件中写入 `registry-mirrors` 数组，可以指引本地 Docker 客户端去拉取国内大厂镜像源，从而绕开国际出口的阻滞。" },
+            { id: 167, type: "judge", q: "半虚拟化技术中，客户机操作系统需要进行修改以意识到自己运行在虚拟化环境中。", options: ["正确", "错误"], ans: "A", parse: "半虚拟化要求 Guest OS 积极配合 Hypervisor。通过对内核代码进行打补丁修改，让虚机主动发起 Hypercall 规避高损耗特权异常，从而狂拉性能。" },
+            { id: 168, type: "judge", q: "硬件辅助全虚拟化（如 Intel VT-x）不需要修改客户机操作系统。", options: ["正确", "错误"], ans: "A", parse: "因物理 CPU 在电路和微架构级别直接引入了 VMX 指令集（非根模式），底层硬件能够自动捕获虚机核心敏感异常，从而保证了虚机操作系统零修改的兼容性。" },
+            { id: 169, type: "judge", q: "微内核架构比宏内核架构具有更高的通信效率。", options: ["正确", "错误"], ans: "B", parse: "微内核由于各大基础服务完全隔离在用户空间不同的独立进程里，彼此通讯必须高频触发跨进程上下文切换（IPC），其绝对效率远逊于宏内核的直接函数指针调用。" },
+            { id: 170, type: "judge", q: "SATA 接口和 NVMe 接口都支持热插拔，但 NVMe 的传输速率远高于 SATA。", options: ["正确", "错误"], ans: "A", parse: "SATA3 物理带宽上限理论上被牢牢锁死在 6Gbps，而 NVMe 深度压榨 PCIe 高速大带宽通道，吞吐量轻松甩开 SATA 一个数量级。" },
+            { id: 171, type: "judge", q: "在 CentOS 7 中，网卡静态 IP配置中 GATEWAY 代表的是网卡分配的 IP 地址。", options: ["正确", "错误"], ans: "B", parse: "GATEWAY 英文直译即为“网关”，它代表的是本地网络连接外部因特网的出口路由节点物理 IP 地址，并非本机网卡自身的 IP 地址（IPADDR）。" },
+            { id: 172, type: "judge", q: "使用 dd 命令创建非空洞磁盘文件时，会实际在磁盘上写入指定大小的数据（如全 0）。", options: ["正确", "错误"], ans: "A", parse: "dd 命令会老老实实通过文件系统向底层的物理扇区填满对应体积的真实 0 字节字节流，直接产生大量的实际磁盘硬件 I/O 写入消耗。" },
+            { id: 173, type: "judge", q: "空洞文件（Sparse File）在复制（cp）时，默认情况下会变成非空洞文件。", options: ["正确", "错误"], ans: "B", parse: "Linux 的核心文件系统及 cp 命令默认对稀疏空洞文件带有高级优化，在不施加特殊反向参数前提下，复制出来的全套复本会自动沿袭空洞文件的结构。" },
+            { id: 174, type: "judge", q: "存储卷（Storage Volume）是独立于虚拟机的逻辑存储单位，可以挂载到不同的虚拟机。", options: ["正确", "错误"], ans: "A", parse: "存储卷解耦了计算和数据，由于它在 libvirt 或存储引擎中是个纯粹的独立资源块，可以根据业务需要灵活分离并重新挂接到其他虚机实例上。" },
+            { id: 175, type: "judge", q: "NFS 客户端无法挂载服务器目录，只可能是由于服务器端的防火墙未关闭导致。", options: ["正确", "错误"], ans: "B", parse: "导致 NFS 挂载失败的安全要素极多：可能服务端 exports 文件写错、可能根本没启动 rpcbind 服务、可能 SElinux 策略阻断，绝非仅防火墙一个原因。" },
+            { id: 176, type: "judge", q: "LVM 的物理块（PE）默认大小是 4MB。", options: ["正确", "错误"], ans: "A", parse: "物理卷 PV 在初始化划分阶段，被切分成的最底层、最小颗粒度的基本逻辑递加单元（Physical Extent）默认体积即为 4MB。" },
+            { id: 177, type: "judge", q: "虚拟网桥通过学习 MAC 地址来构建转发表，实现数据帧的精准转发。", options: ["正确", "错误"], ans: "A", parse: "软件网桥完整承袭了 IEEE 802.1D 物理网桥规范。它通过监听经过端口的数据帧源 MAC 填入自己的 CAM 表，从而实现局域网的二层精准定向分发。" },
+            { id: 178, type: "judge", q: "virt-install 命令的 --vcpus 参数用于指定虚拟机的内存大小。", options: ["正确", "错误"], ans: "B", parse: "不学无术的干扰项。--vcpus 的作用是分配虚拟 CPU 数量；控制并配置虚拟机物理运行“内存大小”的对应参数应该为 `--ram` 或 `--memory`。" },
+            { id: 179, type: "judge", q: "VNC 默认的 TCP 端口是从 5900 开始的。", options: ["正确", "错误"], ans: "A", parse: "VNC 基于经典的 X11 显示通道原理。桌面号为 :1 的连接实际上绑定的物理监听端口即为 5901，以此类推向上递加。" },
+            { id: 180, type: "judge", q: "使用 Dockerfile 构建镜像时，指令的编写顺序不会影响镜像的构建缓存和效率。", options: ["正确", "错误"], ans: "B", parse: "Docker 严重依赖构建层缓存。如果把高频变动的 COPY 脚本或编译指令写得太靠前，一旦被改动会造成后面所有的指令缓存大面积失效，直接严重降低重构效率。" },
+            { id: 181, type: "judge", q: "系统虚拟机和进程虚拟机的主要区别在于是否运行完整的操作系统。", options: ["正确", "错误"], ans: "A", parse: "这是对虚拟机分类最底层的核心准则：看它是对上提供一整套虚拟“硬架构”，还是仅仅为了翻译特定的进程中间语言代码。" },
+            { id: 182, type: "judge", q: "KVM 是由红帽（Red Hat）公司完全独立开发、从未开源的私有技术。", options: ["正确", "错误"], ans: "B", parse: "KVM 最早是由以色列科技公司 Qumranet 开发并以开源协议贡献给社区的（红帽在 2008 年对其进行了战略收购），本身属于地道的开源技术拓扑。" },
+            { id: 183, type: "judge", q: "安装 KVM 时，通常需要确保 CPU 已经在 BIOS 中开启了虚拟化支持（如 VT-x 或 AMD-V）。", options: ["正确", "错误"], ans: "A", parse: "KVM 的内核运行机制依赖硬件辅助虚拟化。如果物理主板 BIOS 闭锁了虚拟化拓展开关，KVM 内核模块（kvm_intel/kvm_amd）将直接报错拒绝初始化加载。" },
+            { id: 184, type: "judge", q: "通过 lsblk 命令可以查看 Linux 系统中的块设备组织结构和挂载点。", options: ["正确", "错误"], ans: "A", parse: "lsblk（list block devices）命令可以用极度优雅、直观的树状缩进排版形式，将系统当前的硬盘、分区、LVM 嵌套关系和各级文件系统挂载点清晰吐出来。" },
+            { id: 185, type: "judge", q: "Hypervisor（虚拟监控器）是虚拟化技术中的核心组件，直接负责资源的分配和隔离。", options: ["正确", "错误"], ans: "A", parse: "Hypervisor（或称 VMM）直接凌驾于物理资源或宿主内核之侧，它的核心天职就是死死焊住并分割多台虚拟机之间的安全硬件运行边界。" },
+            { id: 186, type: "judge", q: "容器虚拟化技术因为共享宿主机内核，所以其隔离性天然比传统虚拟机更好。", options: ["正确", "错误"], ans: "B", parse: "恰恰相反！正因为容器所有进程共用同一个内核（仅靠逻辑空间封锁），一旦某个容器爆发内核提权漏洞，将直接威胁到宿主机安全性，故而其隔离级别天然劣于具有完整虚机独立内核的硬件全虚拟化。" },
+            { id: 187, type: "judge", q: "使用 qemu-img info 命令可以查看虚拟磁盘文件的格式、大小和预分配情况。", options: ["正确", "错误"], ans: "A", parse: "该管理指令能够精准拆解镜像文件的头部元数据，把它的逻辑账面容量、实际宿主机占用物理尺寸、格式簇大小全盘优雅展示。" },
+            { id: 188, type: "judge", q: "Docker 容器停止后，其中的所有数据都会自动丢失。", options: ["正确", "错误"], ans: "B", parse: "容器处于停止状态（Exited）时，其可写层对应的磁盘临时数据依然完整被宿主机保留。除非执行了带有删除参数的指令（如 docker rm）才会彻底抹去。" },
+            { id: 189, type: "judge", q: "Kubernetes 中，一个 Pod 只能运行一个容器。", options: ["正确", "错误"], ans: "B", parse: "Pod 作为 K8s 最小的逻辑调度单元，允许并经常在一个 Pod 内部署并列的多个高度协同的容器（例如经典的 Sidecar 辅助日志收集或网格代理代理设计模式）。" },
+            { id: 190, type: "judge", q: "Jenkins 只能通过图形界面配置流水线任务。", options: ["正确", "错误"], ans: "B", parse: "现代持续集成（CI/CD）极力推崇“流水线即代码（Pipeline as Code）”理念。开发日常普遍通过编写标准的 Jenkinsfile 文本脚本直接向代码库进行集成和任务部署。" },
+            { id: 191, type: "judge", q: "KVM 存储池中的\"logical\"类型基于 LVM 实现。", options: ["正确", "错误"], ans: "A", parse: "在配置 libvirt 存储源时，指定 pool 类型为 logical 即代表指引管理器去宿主机的 LVM 卷组（VG）里直接为虚机切割并划分物理块空间。" },
+            { id: 192, type: "judge", q: "Docker Hub 是 Docker 官方提供的公共镜像仓库服务。", options: ["正确", "错误"], ans: "A", parse: "判断题 165 题的复现，此项说法在原知识库内被交叉确认为完全正确无误的标准叙述。" },
+            { id: 193, type: "judge", q: "在桥接模式下，虚拟机无法与宿主机通信。", options: ["正确", "错误"], ans: "B", parse: "在桥接拓扑中，宿主机的物理网卡上实际附着了一个隐藏的逻辑虚拟交换机，虚机和宿主机在同一个二层网关内，拥有完全对等互通的网络访问特权。" },
+            { id: 194, type: "judge", q: "virtio 驱动需要在客户机中安装才能发挥最佳性能。", options: ["正确", "错误"], ans: "A", parse: "半虚拟化的要义就是两端打通。虽然 Linux 现代内核普遍原生内置了 virtio 驱动，但如果运行的是 Windows 客户机，必须在装机时手动加载 virtio 驱动光盘才能解锁高性能硬件吞吐。" }
+        ];
+
+        function renderQuiz(filter = 'all') {
+            const container = document.getElementById('quiz-container');
+            container.innerHTML = '';
+
+            const filteredData = quizData.filter(item => filter === 'all' || item.type === filter);
+            
+            filteredData.forEach((item) => {
+                const card = document.createElement('div');
+                card.className = 'question-card';
+                card.id = `q-card-${item.id}`;
+
+                const badge = document.createElement('span');
+                badge.className = `badge ${item.type === 'choice' ? 'badge-choice' : 'badge-judge'}`;
+                badge.innerText = item.type === 'choice' ? '单选题' : '判断题';
+
+                const title = document.createElement('div');
+                title.className = 'question-title';
+                title.appendChild(badge);
+                title.append(` 题 ${item.id}. ${item.q}`);
+                card.appendChild(title);
+
+                const optionsList = document.createElement('ul');
+                optionsList.className = 'options-list';
+
+                item.options.forEach((opt, oIdx) => {
+                    const letter = String.fromCharCode(65 + oIdx); // A, B, C, D
+                    const li = document.createElement('li');
+                    li.className = 'option-item';
+
+                    const label = document.createElement('label');
+                    label.className = 'option-label';
+                    label.id = `label-${item.id}-${letter}`;
+
+                    const input = document.createElement('input');
+                    input.type = 'radio';
+                    input.name = `q-${item.id}`;
+                    input.value = letter;
+                    // 给 radio 绑定点击事件，实现单个点击即刻交互
+                    input.onchange = () => checkSingleQuestion(item.id, letter, item.ans, item.parse);
+                    
+                    label.appendChild(input);
+                    label.append(` ${letter}. ${opt}`);
+                    li.appendChild(label);
+                    optionsList.appendChild(li);
+                });
+
+                card.appendChild(optionsList);
+
+                // 即时反馈解析区
+                const fbBox = document.createElement('div');
+                fbBox.className = 'instant-feedback';
+                fbBox.id = `feedback-${item.id}`;
+                card.appendChild(fbBox);
+
+                container.appendChild(card);
+            });
+        }
+
+        // 单题交互核心逻辑
+        function checkSingleQuestion(qId, selectedLetter, correctLetter, analysis) {
+            const card = document.getElementById(`q-card-${qId}`);
+            const fbBox = document.getElementById(`feedback-${qId}`);
+            
+            // 1. 如果该题已经回答过，禁止二次点击篡改
+            if (card.classList.contains('answered')) {
+                return;
+            }
+            card.classList.add('answered');
+
+            // 2. 冻结该题内所有的 radio 输入框
+            card.querySelectorAll(`input[name="q-${qId}"]`).forEach(input => input.disabled = true);
+
+            // 3. 高亮正确答案对应的 label 框
+            const correctLabel = document.getElementById(`label-${qId}-${correctLetter}`);
+            if (correctLabel) correctLabel.classList.add('correct-target');
+
+            const isCorrect = (selectedLetter === correctLetter);
+
+            // 4. 判断对错，更新 UI 和解析视图
+            fbBox.innerHTML = ''; // 清空
+            
+            const statusDiv = document.createElement('div');
+            const analysisDiv = document.createElement('div');
+            analysisDiv.className = 'analysis-text';
+
+            if (isCorrect) {
+                fbBox.className = 'instant-feedback show true-style';
+                statusDiv.className = 'feedback-status true-text';
+                statusDiv.innerText = '✓ True (回答正确)';
+            } else {
+                fbBox.className = 'instant-feedback show false-style';
+                statusDiv.className = 'feedback-status false-text';
+                statusDiv.innerText = `✗ False (回答错误，您选了 ${selectedLetter})`;
+                
+                // 标记用户点错的那个选项变红
+                const wrongLabel = document.getElementById(`label-${qId}-${selectedLetter}`);
+                if (wrongLabel) wrongLabel.classList.add('wrong-clicked');
+            }
+
+            analysisDiv.innerHTML = `<strong>【考点解析】</strong> ${analysis}`;
+            fbBox.appendChild(statusDiv);
+            fbBox.appendChild(analysisDiv);
+        }
+
+        function filterQuiz(type) {
+            document.querySelectorAll('.filter-nav .btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            renderQuiz(type);
+        }
+
+        // 初始化渲染
+        renderQuiz('all');
+    </script>
+</body>
+</html>
